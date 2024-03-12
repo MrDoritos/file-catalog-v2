@@ -5,9 +5,8 @@ import random
 import math
 
 class CatalogItem:
-    def __init__(self, name, data, id, items, x, y):
+    def __init__(self, name, id, items, x, y):
         self.name = name
-        self.data = data
         self.id = id
         self.items = items
         self.x = x
@@ -15,9 +14,9 @@ class CatalogItem:
 
 # Create a catalog of items
 catalog = [
-    CatalogItem("Item 1", "Data 1", 1, [], 0.5, 0.5),
-    CatalogItem("Item 2", "Data 2", 2, [], 0, 0.5),
-    CatalogItem("Item 3", "Data 3", 3, [], -0.5, 0),
+    CatalogItem("Item 1", 1, [], 0.5, 0.5),
+    CatalogItem("Item 2", 2, [], 0, 0.5),
+    CatalogItem("Item 3", 3, [], -0.5, 0),
 ]
 
 def generate_new_id():
@@ -80,39 +79,38 @@ def get_catalog_vector_for_name(name):
         y = math.cos(theta)
         return x, y
 
-def get_catalog_vector(name, data):
+def get_catalog_vector(name):
     # Get the average vector coordinate for new item
     weight = 0.8
     x, y = get_catalog_vector_for_name(name)
     return generate_unique_coordinates(x,y,1 - weight, 0.01)
 
 
-def add_catalog_item(name, data):
+def add_catalog_item(name):
     # Generate a new id for the catalog item
     new_id = generate_new_id()
     # Create a new catalog item
-    x, y = get_catalog_vector(name, data)
+    x, y = get_catalog_vector(name)
     # Check if any items in the catalog match the given name and data
-    matching_items = [item for item in catalog if item.name == name and item.data == data]
+    matching_items = [item for item in catalog if item.name == name]
 
     # If there is a matching item, return it
     if matching_items:
         return matching_items[0]
 
     # Otherwise, continue with adding the new item to the catalog
-    new_item = CatalogItem(name, data, new_id, [], x, y)
+    new_item = CatalogItem(name, new_id, [], x, y)
     # Add the new item to the catalog
     catalog.append(new_item)
     
     return new_item
 
-def change_catalog_item(id, name, data):
+def change_catalog_item(id, name):
     # Find the item with the given id in the catalog
     item = next((item for item in catalog if item.id == id), None)
     if item:
         # Update the item fields with the input data
         item.name = name
-        item.data = data
         return item
     else:
         return None
@@ -120,11 +118,12 @@ def change_catalog_item(id, name, data):
 def calculate_vector_coordinates(item):
     # Base case: if the item has no items, return its own coordinates
     if not item.items:
-        return get_catalog_vector(item.name, item.data)
+        return get_catalog_vector(item.name)
     
     # Recursive case: calculate the coordinates of all the items within the item
-    sub_coordinates = [calculate_vector_coordinates(get_catalog_item(sub_item)) for sub_item in item.items]
-    
+    #sub_coordinates = [calculate_vector_coordinates(get_catalog_item(sub_item)) for sub_item in item.items]
+    sub_coordinates = [get_catalog_vector(get_catalog_item(sub_item).name) for sub_item in item.items]
+
     c_x = sum(x for x, y in sub_coordinates) / len(sub_coordinates)
     c_y = sum(y for x, y in sub_coordinates) / len(sub_coordinates)
 
@@ -211,7 +210,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             json_data = json.loads(post_data)
 
             # Create a new catalog item
-            new_item = add_catalog_item(json_data['name'], json_data['data'])
+            new_item = add_catalog_item(json_data['name'])
 
             # Send response status code
             self.send_response(200)
@@ -238,9 +237,9 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
                 # Update all fields of the item with the input data
                 item.name = json_data['name']
-                item.data = json_data['data']
                 item.id = json_data['id']
-                item.items = list(set(json_data['items']))
+                if json_data['items'] and len(json_data['items']) > 0:
+                    item.items = list(set(json_data['items']))
                 item.x, item.y = calculate_vector_coordinates(item)
 
                 # Send response status code

@@ -20,14 +20,14 @@ with open(file_path) as file:
 # For example, you can access specific values like this:
 value = data["Addons"]
 
-def add_catalog_item(name, data):
+def add_catalog_item(name):
     # Define the URL for the API endpoint
     url = "http://localhost:8000/api/addItem"
 
     # Create a dictionary with the catalog item data
     catalog_item = {
         "name": name,
-        "data": data
+        "items": []
     }
 
     # Send a POST request to the API endpoint
@@ -76,18 +76,31 @@ def set_catalog_item(item):
 def add_item(item, subitem):
     item["items"].append(subitem["id"])
 
+def add_items(item, *args):
+    last = item
+    args = args[::-1]  # Reverse the order of args
+    for arg in args:
+        temp = add_catalog_item(arg)
+        last["items"].append(temp["id"])
+        set_catalog_item(last)
+        last = temp
+
 iterations = 0
 for key, value in data["Addons"].items():
     iterations += 1
     if iterations > max_iterations: break
     #print(value["name"])
-    addon = add_catalog_item("addon", value["name"])
-    add_item(addon, add_catalog_item("slug", value["slug"]))
+    addon = add_catalog_item(value["name"])
+    add_items(addon, "addon")
+    add_items(addon, "slug", value["slug"])
     for author in value["authors"]:
-        add_item(addon, add_catalog_item("author", author["name"]))
+        #add_item(addon, add_catalog_item("author", author["name"]))
+        add_items(addon, "author", author["name"])
     #print(value)
-    add_item(addon, add_catalog_item("addonId", key))
-    add_item(addon, add_catalog_item("primaryCategoryId", value["primaryCategoryId"]))
+    #add_item(addon, add_catalog_item("addonId", key))
+    add_items(addon, "addonId", key)
+    #add_item(addon, add_catalog_item("primaryCategoryId", value["primaryCategoryId"]))
+    add_items(addon, "primaryCategoryId", value["primaryCategoryId"])
     set_catalog_item(addon)
     print(addon)
 
@@ -97,14 +110,19 @@ iterations = 0
 for key, value in data["AddonFiles"].items():
     iterations += 1
     if iterations > max_iterations: break
-    addonfile = add_catalog_item("addonFile", value["displayName"])
-    add_item(addonfile, add_catalog_item("fileName", value["fileName"]))
-    add_item(addonfile, add_catalog_item("id", value["id"]))
-    add_item(addonfile, add_catalog_item("addonId", value["baseAddonId"]))
+    addonfile = add_catalog_item(value["displayName"])
+    add_items(addonfile, "addonFile")
+    #add_item(addonfile, add_catalog_item("fileName", value["fileName"]))
+    add_items(addonfile, "fileName", value["fileName"])
+    #add_item(addonfile, add_catalog_item("id", value["id"]))
+    add_items(addonfile, "id", value["id"])
+    #add_item(addonfile, add_catalog_item("addonId", value["baseAddonId"]))
+    add_items(addonfile, "addonId", value["baseAddonId"])
     base_addon = next((item for item in data["Addons"].values() if item["id"] == int(value["baseAddonId"])), None)
     #print(base_addon)
     print("add")
     if base_addon:
-        add_item(addonfile, add_catalog_item("addon", base_addon["name"]))
+        #add_item(addonfile, add_catalog_item("addon", base_addon["name"]))
+        add_items(addonfile, "addon", base_addon["name"])
     set_catalog_item(addonfile)
     #print(value)

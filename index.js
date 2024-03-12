@@ -87,6 +87,24 @@ canvas.addEventListener('mousedown', function(event) {
     lastMouseY = event.clientY;
 });
 
+function setVisibility(item, visible, depth=0, maxdepth=5) {
+    item.visible = visible;
+    if (depth == 0) {
+        CatalogItems.forEach(item2 => {
+            item2.items.forEach(subItem => {
+                if (item.id == subItem)
+                    item2.visible = true;
+            });
+        });
+    }
+    if (item.items.length > 0 && depth < maxdepth) {
+        item.items.forEach(subItem => {
+            const subItem2 = CatalogItems.find(item => item.id == subItem);
+            setVisibility(subItem2, visible, depth+1, maxdepth);
+        });
+    }
+}
+
 canvas.addEventListener('mouseup', function(event) {
     isDragging = false;
 
@@ -117,6 +135,11 @@ canvas.addEventListener('mouseup', function(event) {
         if (mouseX >= itemX && mouseX <= itemX + itemWidth && mouseY >= itemY && mouseY <= itemY + itemHeight) {
             // Item is selected, do something with it
             console.log('Selected item:', item);
+            CatalogItems.forEach(item => {
+                item.visible = false;
+            });
+            setVisibility(item, true);
+            /*
             for (var i = 0; i < CatalogItems.length; i++) {
                 CatalogItems[i].visible = false;
                 CatalogItems[i].items.forEach(subItem => {
@@ -132,7 +155,7 @@ canvas.addEventListener('mouseup', function(event) {
                         CatalogItems[i].visible = true;
                     }
                 });
-            }
+            }*/
             setSelectedItem(item);
             break;
         } 
@@ -142,24 +165,51 @@ canvas.addEventListener('mouseup', function(event) {
     drawCatalogItems();
 });
 
+function get_catalog_item(id) {
+    //Get the item using a GET request
+    fetch(`http://localhost:8000/api/item/${id}`)
+        .then(response => response.json())
+        .then(item => {
+            console.log(item);
+            // Handle the item data here
+            return item["item"];
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Handle the error here
+            return null;
+        });
+}
+
 function get_catalog_name_vectors() {
     const nameVectors = {};
     CatalogItems.forEach(item => {
-        const { name, x, y } = item;
-        if (!nameVectors[name]) {
-            nameVectors[name] = {
-                minX: x,
-                minY: y,
-                maxX: x,
-                maxY: y
-            };
-        } else {
-            const vector = nameVectors[name];
-            vector.minX = Math.min(vector.minX, x);
-            vector.minY = Math.min(vector.minY, y);
-            vector.maxX = Math.max(vector.maxX, x);
-            vector.maxY = Math.max(vector.maxY, y);
-        }
+        if (item.items.length > 0)
+            return;
+        //const { name, x, y } = CatalogItems.find(item2 => item2.id == item.items[0]);
+        CatalogItems.forEach(item2 => {
+            if (item.id != item2.items[0])
+                return;
+
+            const name = item.name;
+            const x = item2.x;
+            const y = item2.y;
+
+            if (!nameVectors[name]) {
+                nameVectors[name] = {
+                    minX: x,
+                    minY: y,
+                    maxX: x,
+                    maxY: y
+                };
+            } else {
+                const vector = nameVectors[name];
+                vector.minX = Math.min(vector.minX, x);
+                vector.minY = Math.min(vector.minY, y);
+                vector.maxX = Math.max(vector.maxX, x);
+                vector.maxY = Math.max(vector.maxY, y);
+            }
+        });        
     });
     return nameVectors;
 }
@@ -190,8 +240,8 @@ function drawCatalogItems() {
             ctx.stroke();
             
             // Add text of the data inside the selectable area
-            ctx.fillText(item.data, itemX, itemY);
-            ctx.fillText(item.name, itemX, itemY + itemHeight);
+            ctx.fillText(item.name, itemX, itemY);
+            //ctx.fillText(item.name, itemX, itemY + itemHeight);
         }
     });
 
@@ -249,20 +299,6 @@ drawCatalogItems();
 
 autoscaleItems();
 
-function get_catalog_item(id) {
-    //Get the item using a GET request
-    fetch(`http://localhost:8000/api/item/${id}`)
-        .then(response => response.json())
-        .then(item => {
-            console.log(item);
-            // Handle the item data here
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Handle the error here
-        });
-}
-
 function set_catalog_item(item) {
     // Send a POST request to update the item
     fetch(`http://localhost:8000/api/item/${item.id}`, {
@@ -283,11 +319,10 @@ function set_catalog_item(item) {
     });
 }
 
-function add_catalog_item(name, data) {
+function add_catalog_item(name) {
     // Create a new item object
     const newItem = {
-        name: name,
-        data: data
+        name: name
     };
     // Send a POST request to add the new item
     fetch('http://localhost:8000/api/addItem', {
@@ -314,9 +349,9 @@ function addItem() {
     // Create a new item object
     const form = document.getElementById('addItem');
     const nameInput = form.querySelector('input[name="name"]');
-    const dataInput = form.querySelector('input[name="data"]');
+    //const dataInput = form.querySelector('input[name="data"]');
 
-    console.log(add_catalog_item(nameInput.value, dataInput.value));
+    console.log(add_catalog_item(nameInput.value));
 }
 
 function setSelectedItem(item) {
@@ -349,8 +384,7 @@ function editItem() {
     
     // Create a new item object
     const editedItem = {
-        name: nameInput.value,
-        data: dataInput.value
+        name: nameInput.value
     };
     
     // Call the set_catalog_item function to update the item
