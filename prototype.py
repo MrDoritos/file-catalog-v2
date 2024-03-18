@@ -1,3 +1,4 @@
+#!/bin/python3
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -129,6 +130,21 @@ def calculate_vector_coordinates(item):
 
     return c_x, c_y
 
+def get_first_order_items():
+    # Get all the items that are not items of any other items
+    first_order_items = [item for item in catalog if len(item.items) < 1]
+    return first_order_items
+
+def get_child_items(id):
+    # Find the item with the given id in the catalog
+    item = next((item for item in catalog if item.id == id), None)
+    if item:
+        # Get all the items that are items of the given item
+        child_items = [get_catalog_item(child_item) for child_item in item.items]
+        return child_items
+    else:
+        return None
+
 # Define the request handler class
 class MyRequestHandler(BaseHTTPRequestHandler):
     # Update the do_GET method to handle serving catalog items by id
@@ -188,6 +204,25 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                     # Send response body
                     response = {'message': 'Item not found'}
                     self.wfile.write(json.dumps(response).encode())
+            elif self.path.startswith('/api/child_items/'):
+                item_id = int(self.path.split('/')[-1])
+                # Find the item with the given id in the catalog
+                item = next((item for item in catalog if item.id == item_id), None)
+                if item:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    response = {'items': [item.__dict__ for item in get_child_items(item_id)]}
+                    self.wfile.write(json.dumps(response).encode())
+                else:
+                    # Send response status code
+                    self.send_response(404)
+                    # Send headers
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    # Send response body
+                    response = {'message': 'Item not found'}
+                    self.wfile.write(json.dumps(response).encode())                    
             elif self.path == '/api/items':
                 # Send response status code
                 self.send_response(200)
@@ -196,6 +231,12 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 # Send response body
                 response = {'items': [item.__dict__ for item in catalog]}
+                self.wfile.write(json.dumps(response).encode())
+            elif self.path == '/api/first_order_items':
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = { 'items': [item.__dict__ for item in get_first_order_items()]}
                 self.wfile.write(json.dumps(response).encode())
         
 

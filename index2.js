@@ -3,67 +3,20 @@ const canvas = document.getElementById('canvasVectorSpace');
 const canvasSelectedItem = document.getElementById('canvasSelectedItem');
 const ctx = canvas.getContext('2d');
 const ctxSelectedItem = canvasSelectedItem.getContext('2d');
-var CatalogItems = []; // Array to store all items
+//var CatalogItems = []; // Array to store all items
 var SelectedItem = null; // Variable to store the selected item
-
+var index = new Index();
 // Fetch all items from the API
 function getCatalogFirstOrderItems() {
-    fetch('http://localhost:8000/api/first_order_items')
-        .then(response => response.json())
-        .then(items => {
-            console.log(items);
-            console.log("Getting first order items");
-            if (Array.isArray(items.items)) {
-                CatalogItems = items.items;
-                CatalogItems.forEach(item => {
-                    item.visible = true;
-                })
-            } else {
-                console.error('Items is not an array');
-            }
-        });
+    return index.getFirstOrderItems();
 }
 
 function getChildItems(id) {
-    fetch(`http://localhost:8000/api/child_items/${id}`)
-        .then(response => response.json())
-        .then(items => {
-            console.log(items);
-            console.log("Getting child items");
-            if (Array.isArray(items.items)) {
-                items.items.forEach(item => {
-                    item.visible = true;
-                    if (!CatalogItems.some(item2 => item2.id === item.id)) {
-                        CatalogItems.push(item);
-                    } else {
-                        let foundItem = CatalogItems.find(item2 => item2.id === item.id);
-                        foundItem = item;
-                    }
-                });
-                return items.items;
-            } else {
-                console.error('Items is not an array');
-            }
-        });
+    return index.getChildItems({id:id});
 }
 
 function getCatalogItems() {
-    fetch('http://localhost:8000/api/items')
-        .then(response => response.json())
-        .then(items => {
-            console.log(items);
-            console.log("Getting items");
-            // Check if items is an array
-            if (Array.isArray(items.items)) {
-                // Loop through each item
-                CatalogItems = items.items;
-                for (var i = 0; i < CatalogItems.length; i++) {
-                    CatalogItems[i].visible = true;
-                }
-            } else {
-                console.error('Items is not an array');
-            }
-        });
+    return index.getItems();
 }
 
 var scalingFactor = 1.1;
@@ -132,7 +85,7 @@ canvas.addEventListener('mousedown', function(event) {
 function setVisibility(item, visible, depth=0, maxdepth=5) {
     item.visible = visible;
     if (depth == 0) {
-        CatalogItems.forEach(item2 => {
+        index.catalog.forEach(item2 => {
             item2.items.forEach(subItem => {
                 if (item.id == subItem)
                     item2.visible = true;
@@ -141,7 +94,7 @@ function setVisibility(item, visible, depth=0, maxdepth=5) {
     }
     if (item.items.length > 0 && depth < maxdepth) {
         item.items.forEach(subItem => {
-            const subItem2 = CatalogItems.find(item => item.id == subItem);
+            const subItem2 = index.catalog.find(item => item.id == subItem);
             setVisibility(subItem2, visible, depth+1, maxdepth);
         });
     }
@@ -161,12 +114,12 @@ canvas.addEventListener('mouseup', function(event) {
     // Loop through each item and check if the mouse coordinates are within its bounds
     //CatalogItems.forEach((item, index) => {
 
-    CatalogItems.forEach(item => {
+    index.catalog.forEach(item => {
         item.visible = true;
     });
 
-    for (var i = 0; i < CatalogItems.length; i++) {
-        var item = CatalogItems[i];
+    for (var i = 0; i < index.catalog.length; i++) {
+        var item = index.catalog[i];
         // Calculate the bounds of the item
         const itemX = convertToCanvasX(item.x);
         const itemY = convertToCanvasY(item.y);
@@ -177,7 +130,7 @@ canvas.addEventListener('mouseup', function(event) {
         if (mouseX >= itemX && mouseX <= itemX + itemWidth && mouseY >= itemY && mouseY <= itemY + itemHeight) {
             // Item is selected, do something with it
             console.log('Selected item:', item);
-            CatalogItems.forEach(item => {
+            index.catalog.forEach(item => {
                 item.visible = false;
             });
             setVisibility(item, true);
@@ -208,32 +161,16 @@ canvas.addEventListener('mouseup', function(event) {
 });
 
 function get_catalog_item(id) {
-    //Get the item using a GET request
-    fetch(`http://localhost:8000/api/item/${id}`)
-        .then(response => response.json())
-        .then(item => {
-            console.log("Got:" + item);
-            // Handle the item data here
-            let _item = item["item"];
-            if (!CatalogItems.some(item => item.id === _item.id)) {
-                CatalogItems.push(_item);
-            }
-            return _item;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Handle the error here
-            return null;
-        });
+    return index.getItem({id:id});
 }
 
 function get_catalog_name_vectors() {
     const nameVectors = {};
-    CatalogItems.forEach(item => {
+    index.catalog.forEach(item => {
         if (item.items.length > 0)
             return;
         //const { name, x, y } = CatalogItems.find(item2 => item2.id == item.items[0]);
-        CatalogItems.forEach(item2 => {
+        index.catalog.forEach(item2 => {
             if (item.id != item2.items[0])
                 return;
 
@@ -276,7 +213,7 @@ function drawSelectedItem() {
         
         // Draw child items
         SelectedItem.items.forEach(childItemId => {
-            const childItem = CatalogItems.find(item => item.id === childItemId);
+            const childItem = index.catalog.find(item => item.id === childItemId);
             if (childItem) {
                 const childItemX = convertToCanvasX(childItem.x);
                 const childItemY = convertToCanvasY(childItem.y);
@@ -300,7 +237,7 @@ function drawCatalogItems() {
     //ctx.scale(zoomFactor, zoomFactor); // Zoom
     //ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
 
-    CatalogItems.forEach((item, index) => {
+    index.catalog.forEach((item, index) => {
         // Calculate the coordinates of the selectable area
         const itemX = convertToCanvasX(item.x);
         const itemY = convertToCanvasY(item.y);
@@ -357,10 +294,10 @@ function zoomCanvas(scale) {
 // Autoscale all items on the canvas using a scaling factor
 function autoscaleItems() {
     // Determine a global scaling factor here
-    const minX = Math.min(...CatalogItems.map(item => item.x));
-    const maxX = Math.max(...CatalogItems.map(item => item.x));
-    const minY = Math.min(...CatalogItems.map(item => item.y));
-    const maxY = Math.max(...CatalogItems.map(item => item.y));
+    const minX = Math.min(...index.catalog.map(item => item.x));
+    const maxX = Math.max(...index.catalog.map(item => item.x));
+    const minY = Math.min(...index.catalog.map(item => item.y));
+    const maxY = Math.max(...index.catalog.map(item => item.y));
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     const scaleX = canvasWidth / (maxX - minX);
@@ -377,49 +314,11 @@ drawCatalogItems();
 autoscaleItems();
 
 function set_catalog_item(item) {
-    // Send a POST request to update the item
-    fetch(`http://localhost:8000/api/item/${item.id}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(item)
-    })
-    .then(response => response.json())
-    .then(responseData => {
-        console.log(responseData);
-        // Handle the response data here
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        // Handle the error here
-    });
+    return index.modifyItem(item);
 }
 
 function add_catalog_item(name) {
-    // Create a new item object
-    const newItem = {
-        name: name
-    };
-    // Send a POST request to add the new item
-    fetch('http://localhost:8000/api/addItem', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newItem)
-    })
-    .then(response => response.json())
-    .then(responseData => {
-        console.log(responseData);
-        // Handle the response data here
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        // Handle the error here
-    });
-
-    return newItem;
+    return index.addItem(name);
 }
 
 function addItem() {
